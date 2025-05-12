@@ -7,6 +7,7 @@ token=os.environ["TB_TOKEN"]
 logging.basicConfig(format='%(asctime)s - TelegramBot - %(levelname)s - %(message)s', level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(update)
     logging.info("se conectó: " + str(update.message.from_user.id))
     if update.message.from_user.first_name:
         nombre=update.message.from_user.first_name
