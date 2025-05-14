@@ -107,5 +107,6 @@ services:
     environment:
       - TZ=America/Argentina/Buenos_Aires 
       - TB_TOKEN=${TB_TOKEN}
+      - TB_AUTORIZADOS=${TB_AUTORIZADOS}
 volumes:
   portainer_data:
