@@ -108,5 +108,9 @@ services:
       - TZ=America/Argentina/Buenos_Aires 
       - TB_TOKEN=${TB_TOKEN}
       - TB_AUTORIZADOS=${TB_AUTORIZADOS}
+      - DOMINIO=${DOMINIO}
+      - MQTT_USR=${MQTT_USR}
+      - MQTT_PASS=${MQTT_PASS}
+      - PUERTO_MQTTS=${PUERTO_MQTTS}
 volumes:
   portainer_data:

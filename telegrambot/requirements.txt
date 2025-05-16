@@ -1,1 +1,5 @@
 python-telegram-bot
+aiomqtt
+certifi
+environs
+aiomysql
