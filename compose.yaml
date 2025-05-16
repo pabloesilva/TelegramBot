@@ -112,5 +112,9 @@ services:
       - MQTT_USR=${MQTT_USR}
       - MQTT_PASS=${MQTT_PASS}
       - PUERTO_MQTTS=${PUERTO_MQTTS}
+      - MARIADB_SERVER=${MARIADB_SERVER}
+      - MARIADB_USER=${MARIADB_USER}
+      - MARIADB_USER_PASS=${MARIADB_USER_PASS}
+      - MARIADB_DB=${MARIADB_DB}
 volumes:
   portainer_data:
