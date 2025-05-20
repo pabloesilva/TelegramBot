@@ -1,7 +1,7 @@
+import asyncio.selector_events
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
-import logging, os, asyncio
-import paho.mqtt.client as mqtt
+import logging, os, asyncio, aiomqtt, ssl
 from telegram.ext import ConversationHandler
 import aiomysql
 import matplotlib.pyplot as plt
@@ -13,14 +13,13 @@ autorizados=[int(x) for x in os.environ["TB_AUTORIZADOS"].split(',')]
 
 logging.basicConfig(format='%(asctime)s - TelegramBot - %(levelname)s - %(message)s', level=logging.INFO)
 
-global client 
-ESPERANDO_SETPOINT=1
-ESPERANDO_PERIODO=1
-
-async def publicar_mensaje(topico, mensaje):
-    global client 
-    top="2C955830E8133FDE/"+topico
-    client.publish(top, mensaje)
+async def publicar_mensaje(context: ContextTypes.DEFAULT_TYPE, topico: str, mensaje):
+    client = context.application.bot_data.get("mqtt_client")
+    if not client:
+        logging.error("MQTT client no disponible en el contexto.")
+        return
+    top = "2C955830E8133FDE/" + topico
+    await client.publish(top, mensaje)
 
 async def sin_autorizacion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("intento de conexión de: " + str(update.message.from_user.id))
@@ -56,16 +55,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if query.data == "0":
-        await publicar_mensaje("rele", 0)
+        await publicar_mensaje(context,"rele", 0)
         await query.edit_message_text("Apagando relé...")
     elif query.data == "1":
-        await publicar_mensaje("rele", 1)
+        await publicar_mensaje(context,"rele", 1)
         await query.edit_message_text("Encendiendo relé...")        
     elif query.data == "2":
-        await publicar_mensaje("modo", 0)
+        await publicar_mensaje(context,"modo", 0)
         await query.edit_message_text("Modo Manual")
     elif query.data == "3":
-        await publicar_mensaje("modo", 1)
+        await publicar_mensaje(context,"modo", 1)
         await query.edit_message_text("Modo Automatico")
 
 async def modo(update: Update, context: ContextTypes.DEFAULT_TYPE): 
@@ -79,18 +78,18 @@ async def modo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # inicia la conversación
 async def pedir_periodo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Ingresa el valor del período en segundos:")
-    return ESPERANDO_PERIODO
+    return 1
 
 # el usuario responde con el valor
 async def recibir_periodo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         valor = int(update.message.text)
-        await publicar_mensaje("periodo",valor)
+        await publicar_mensaje(context,"periodo",valor)
         await update.message.reply_text(f"Período recibido: {valor} segundos.")
         return ConversationHandler.END
     except ValueError:
         await update.message.reply_text("Por favor, ingresá un número válido.")
-    return ESPERANDO_PERIODO
+    return 1
 
 # /cancelar permite salir del flujo
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -99,24 +98,24 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def pedir_setpoint(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Ingresa el valor de referencia de temperatura:")
-    return ESPERANDO_SETPOINT
+    return 1
 
 async def recibir_setpoint(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         valor = int(update.message.text)
         if (valor < 0) or  (valor > 60):
             await update.message.reply_text("Por favor, ingresá un valor coherente.[0-60°C]")
-            return ESPERANDO_SETPOINT    
+            return 1    
         else:
-            await publicar_mensaje("setpoint",valor)
+            await publicar_mensaje(context,"setpoint",valor)
             await update.message.reply_text(f"Setpoint recibido: {valor}°C.")
             return ConversationHandler.END
     except ValueError:
         await update.message.reply_text("Por favor, ingresá un número válido.")
-    return ESPERANDO_SETPOINT
+    return 1
 
 async def destello (update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await publicar_mensaje("destello",1)
+    await publicar_mensaje(context,"destello",1)
     await context.bot.send_animation(update.message.chat.id, "https://media.tenor.com/B2Y36jtHnKwAAAAM/party-lights-night-life.gif")
 
 async def medicion(update: Update, context):
@@ -180,44 +179,59 @@ async def graficos(update: Update, context):
     conn.close()
 
 
-def main():
-    
-    global client
-    
-    client = mqtt.Client()
-    client.username_pw_set(os.environ["MQTT_USR"], os.environ["MQTT_PASS"])
-    client.tls_set()
-    client.connect(os.environ["DOMINIO"], int(os.environ["PUERTO_MQTTS"]))
+async def main():
+      
 
-    client.publish("topico/ejemplo", "Hola desde el bot")
-    client.loop_start()
+    tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    tls_context.verify_mode = ssl.CERT_REQUIRED
+    tls_context.check_hostname = True
+    tls_context.load_default_certs()
     
-    logging.info(autorizados)
-    application = Application.builder().token(token).build()
-    application.add_handler(MessageHandler((~filters.User(autorizados)), sin_autorizacion))
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('acercade', acercade))
-    application.add_handler(CommandHandler('rele', rele))
-    application.add_handler(CallbackQueryHandler(button))
-    application.add_handler(CommandHandler('modo', modo))
-    conv = ConversationHandler(
-            entry_points=[CommandHandler('periodo', pedir_periodo)],
-            states={ESPERANDO_PERIODO: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_periodo)],},
-            fallbacks=[CommandHandler('cancelar', cancelar)],
-    )
-    application.add_handler(conv)
-    
-    conv1 = ConversationHandler(
-            entry_points=[CommandHandler('setpoint', pedir_setpoint)],
-            states={ESPERANDO_SETPOINT: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_setpoint)],},
-            fallbacks=[CommandHandler('cancelar', cancelar)],
-    )
-    application.add_handler(conv1)
-    application.add_handler(CommandHandler('destello', destello))
-    application.add_handler(MessageHandler(filters.Regex("^(temperatura|humedad)$"), medicion))
-    application.add_handler(MessageHandler(filters.Regex("^(gráfico temperatura|gráfico humedad)$"), graficos))
-    
-    application.run_polling()
+    async with aiomqtt.Client(
+        os.environ["DOMINIO"],
+        username=os.environ["MQTT_USR"],
+        password=os.environ["MQTT_PASS"],
+        port=int(os.environ["PUERTO_MQTTS"]),
+        tls_context=tls_context,
+    ) as client:  
+        logging.info(autorizados)
+        application = Application.builder().token(token).build()
+        application.bot_data["mqtt_client"] = client
+        application.add_handler(MessageHandler((~filters.User(autorizados)), sin_autorizacion))
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('acercade', acercade))
+        application.add_handler(CommandHandler('rele', rele))
+        application.add_handler(CallbackQueryHandler(button))
+        application.add_handler(CommandHandler('modo', modo))
+        conv = ConversationHandler(
+                entry_points=[CommandHandler('periodo', pedir_periodo)],
+                states={1: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_periodo)],},
+                fallbacks=[CommandHandler('cancelar', cancelar)],
+        )
+        application.add_handler(conv)
+        
+        conv1 = ConversationHandler(
+                entry_points=[CommandHandler('setpoint', pedir_setpoint)],
+                states={1: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_setpoint)],},
+                fallbacks=[CommandHandler('cancelar', cancelar)],
+        )
+        application.add_handler(conv1)
+        application.add_handler(CommandHandler('destello', destello))
+        application.add_handler(MessageHandler(filters.Regex("^(temperatura|humedad)$"), medicion))
+        application.add_handler(MessageHandler(filters.Regex("^(gráfico temperatura|gráfico humedad)$"), graficos))
+            
+        async with application:  # Calls `initialize` and `shutdown`
+            await application.start()
+            await application.updater.start_polling()
+            # Start other asyncio frameworks here
+            # Add some logic that keeps the event loop running until you want to shutdown
+            while True:
+                try:
+                    await asyncio.sleep(1)
+                except Exception: 
+            # Stop the other asyncio frameworks here
+                    await application.updater.stop()
+                    await application.stop()
     
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
