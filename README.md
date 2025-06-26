@@ -4,24 +4,24 @@ Este bot está diseñado para interactuar con sensores conectados a través de M
 
 ---
 
-## 🧠 Funcionalidades principales
+## Funcionalidades principales
 
-### 📊 Monitoreo de variables ambientales
+### Monitoreo de variables ambientales
 - Consulta de la **última temperatura** o **humedad** registrada.
 - Generación de **gráficos de temperatura o humedad** de las últimas 24h.
 
-### 💡 Control de dispositivos
+### Control de dispositivos
 - Encendido/apagado de un relé.
 - Cambio entre modo **manual** y **automático**.
 - Comando de **destello visual** (animación de luces).
 
-### ⚙️ Configuración de parámetros
+### Configuración de parámetros
 - Definición del valor **setpoint** de temperatura.
 - Configuración del **período de muestreo** del sensor.
 
 ---
 
-## 🧩 Tecnologías utilizadas
+## Tecnologías utilizadas
 
 - **Python 3.11+**
 - **Telegram Bot API** (`python-telegram-bot v20+`)
@@ -32,16 +32,15 @@ Este bot está diseñado para interactuar con sensores conectados a través de M
 
 ---
 
-## 🔐 Seguridad
+## Seguridad
 
 - Solo usuarios autorizados (definidos por ID en la variable de entorno `TB_AUTORIZADOS`) pueden interactuar con el bot.
 - La comunicación MQTT utiliza TLS para cifrado de extremo a extremo.
 
 ---
 
-## 📦 Variables de entorno requeridas
+## Variables de entorno requeridas
 
-Asegurate de configurar estas variables antes de ejecutar el bot:
 
 | Variable                | Descripción                        |
 |------------------------|------------------------------------|
@@ -58,7 +57,7 @@ Asegurate de configurar estas variables antes de ejecutar el bot:
 
 ---
 
-## 🤖 Comandos disponibles
+## Comandos disponibles
 
 | Comando / Mensaje        | Acción                                                        |
 |--------------------------|---------------------------------------------------------------|
